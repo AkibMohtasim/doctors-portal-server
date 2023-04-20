@@ -1,8 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const AppointmentOption = require('./Models/AppointmentOption');
 const Booking = require('./Models/Booking');
+const User = require('./Models/User');
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -15,6 +17,23 @@ require('dotenv').config();
 
 app.use(cors());
 app.use(express.json());
+
+function verifyJWT(req, res, next) {
+  console.log('token inside: ', req.headers.authorization);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send('Unauthorized Access');
+  }
+
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: 'forbidden access' })
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.kfezusn.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
@@ -31,7 +50,7 @@ app.get('/', async (req, res) => {
 })
 
 
-// Appointment Options
+// -------------- Appointment Options --------------------
 
 app.get('/api/appointmentOptions', async (req, res) => {
   const date = req.query.date;
@@ -50,20 +69,25 @@ app.get('/api/appointmentOptions', async (req, res) => {
   })
 
   res.send(options);
-}) // incomplete
+})
 
 
-// Bookings
+// ------------------ Bookings ----------------------
 
-app.get('/api/bookings', async (req, res) => {
-  const bookings = await Booking.find();
+app.get('/api/bookings', verifyJWT, async (req, res) => {
+  const email = req.query.email;
+  const decodedEmail = req.decoded.email;
 
+  if (email !== decodedEmail) {
+    return res.status(403).send({ message: 'forbidden access' });
+  }
+  const query = { email }
+  const bookings = await Booking.find(query);
   res.send(bookings);
 })
 
 app.post('/api/bookings', async (req, res) => {
   const bookingData = req.body;
-  console.log(bookingData);
 
   const query = {
     appointmentDate: bookingData.appointmentDate,
@@ -74,7 +98,7 @@ app.post('/api/bookings', async (req, res) => {
   const alreadyBooked = await Booking.find(query);
 
   if (alreadyBooked.length) {
-    const message = `You already have a booking on ${bookingData.appointmentDate}`;
+    const message = `You already have a booking on ${bookingData.treatment} in ${bookingData.appointmentDate}`;
     return res.send({ acknoledged: false, message })
   }
 
@@ -82,6 +106,32 @@ app.post('/api/bookings', async (req, res) => {
   const result = await newBooking.save();
   res.send(result);
 })
+
+
+
+// ------------------ User -------------------------
+
+app.get('/api/jwt', async (req, res) => {
+  const email = req.query.email;
+  const user = await User.find({ email: email });
+
+  if (user) {
+    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1hr' })
+    return res.send({ accessToken: token })
+  }
+  // console.log(user);
+  res.status(403).send({ accessToken: '' })
+})
+
+
+app.post('/api/users', async (req, res) => {
+  const user = req.body;
+  const newUser = new User(user);
+  const result = await newUser.save();
+  res.send(result);
+
+})
+
 
 
 app.listen(port, () => {
