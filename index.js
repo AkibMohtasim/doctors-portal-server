@@ -92,6 +92,30 @@ app.get('/api/appointmentSpeciality', async (req, res) => {
   res.send(result);
 })
 
+// Temprorary to update price field on appointment options
+
+// app.get('/api/addPrice', async (req, res) => {
+
+//   try {
+//     const updatedDoc = await AppointmentOption.updateMany({},
+//       {
+//         $set: {
+//           price: 99
+//         }
+//       },
+//       { upsert: true, new: true }
+//     );
+
+//     // const result = await updatedDoc.save();
+//     res.send(updatedDoc);
+
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send(error.message);
+//   }
+// })
+
+
 
 // ------------------ Bookings ----------------------
 
@@ -109,7 +133,6 @@ app.get('/api/bookings', verifyJWT, async (req, res) => {
 
 app.post('/api/bookings', async (req, res) => {
   const bookingData = req.body;
-
   const query = {
     appointmentDate: bookingData.appointmentDate,
     email: bookingData.email,
@@ -129,8 +152,29 @@ app.post('/api/bookings', async (req, res) => {
 })
 
 
+app.get('/api/bookings/:id', async (req, res) => {
+  const id = req.params.id;
+  const booking = await Booking.findById(id);
+  res.send(booking);
+})
+
+
 
 // ------------------ User -------------------------
+
+
+app.get('/api/jwt', async (req, res) => {
+  const email = req.query.email;
+  const user = await User.find({ email: email });
+
+  if (user) {
+    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1hr' })
+    return res.send({ accessToken: token })
+  }
+  // console.log(user);
+  res.status(403).send({ accessToken: '' })
+})
+
 
 app.get('/api/users', async (req, res) => {
   const users = await User.find();
@@ -144,18 +188,6 @@ app.get('/api/users/admin/:email', async (req, res) => {
   const user = await User.findOne(query);
   // console.log({ isAdmin: user?.role === 'Admin' });
   res.send({ isAdmin: user?.role === 'Admin' });
-})
-
-app.get('/api/jwt', async (req, res) => {
-  const email = req.query.email;
-  const user = await User.find({ email: email });
-
-  if (user) {
-    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1hr' })
-    return res.send({ accessToken: token })
-  }
-  // console.log(user);
-  res.status(403).send({ accessToken: '' })
 })
 
 

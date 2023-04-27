@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 const appointmentOptionSchema = new mongoose.Schema({
   name: String,
+  price: Number,
   slots: [String]
 },
   {

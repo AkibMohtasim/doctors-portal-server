@@ -7,7 +7,8 @@ const bookingSchema = new mongoose.Schema({
   patient: String,
   slot: String,
   email: String,
-  phone: String
+  phone: String,
+  price: Number
 },
   {
     collection: 'bookings'
