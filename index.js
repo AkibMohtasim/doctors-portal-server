@@ -5,12 +5,11 @@ const cors = require('cors');
 const AppointmentOption = require('./Models/AppointmentOption');
 const Booking = require('./Models/Booking');
 const User = require('./Models/User');
+const Doctor = require('./Models/Doctor');
 const app = express();
 const port = process.env.PORT || 5000;
 
 require('dotenv').config();
-
-
 
 
 //middleware
@@ -19,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 function verifyJWT(req, res, next) {
-  console.log('token inside: ', req.headers.authorization);
+  // console.log('token inside: ', req.headers.authorization);
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(401).send('Unauthorized Access');
@@ -35,6 +34,23 @@ function verifyJWT(req, res, next) {
   })
 }
 
+
+// NOTE: Make sure to use verifyAdmin after verifyJWT
+
+async function verifyAdmin(req, res, next) {
+  const decodedEmail = req.decoded.email;
+  const query = { email: decodedEmail };
+  const user = await User.find(query);
+
+  if (user?.role !== 'Admin') {
+    return res.status(403).send({ message: 'forbidden access' })
+  }
+  next();
+}
+
+
+
+mongoose.set('strictQuery', true);
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.kfezusn.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
 
@@ -69,6 +85,11 @@ app.get('/api/appointmentOptions', async (req, res) => {
   })
 
   res.send(options);
+})
+
+app.get('/api/appointmentSpeciality', async (req, res) => {
+  const result = await AppointmentOption.find().select({ name: 1 });
+  res.send(result);
 })
 
 
@@ -111,6 +132,20 @@ app.post('/api/bookings', async (req, res) => {
 
 // ------------------ User -------------------------
 
+app.get('/api/users', async (req, res) => {
+  const users = await User.find();
+  res.send(users);
+})
+
+
+app.get('/api/users/admin/:email', async (req, res) => {
+  const email = req.params.email;
+  const query = { email };
+  const user = await User.findOne(query);
+  // console.log({ isAdmin: user?.role === 'Admin' });
+  res.send({ isAdmin: user?.role === 'Admin' });
+})
+
 app.get('/api/jwt', async (req, res) => {
   const email = req.query.email;
   const user = await User.find({ email: email });
@@ -131,6 +166,54 @@ app.post('/api/users', async (req, res) => {
   res.send(result);
 
 })
+
+app.put('/api/users/admin/:id', verifyJWT, verifyAdmin, async (req, res) => {
+
+  const id = req.params.id;
+
+  try {
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          role: 'Admin'
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    const result = await updatedUser.save();
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send(error.message);
+  }
+
+})
+
+
+// ---------- Doctor -----------------
+
+app.get('/api/doctors', verifyJWT, verifyAdmin, async (req, res) => {
+  const doctors = await Doctor.find();
+  res.send(doctors);
+})
+
+app.post('/api/doctors', verifyJWT, verifyAdmin, async (req, res) => {
+  const doctor = req.body;
+  const newDoctor = new Doctor(doctor);
+  const result = await newDoctor.save();
+  res.send(result);
+})
+
+
+app.delete('/api/doctors/:id', verifyJWT, verifyAdmin, async (req, res) => {
+  const id = req.params.id;
+  const deletedDoctor = await Doctor.deleteOne({ _id: id })
+  res.send(deletedDoctor);
+})
+
+
 
 
 
