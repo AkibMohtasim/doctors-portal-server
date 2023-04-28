@@ -6,11 +6,12 @@ const AppointmentOption = require('./Models/AppointmentOption');
 const Booking = require('./Models/Booking');
 const User = require('./Models/User');
 const Doctor = require('./Models/Doctor');
+const Payment = require('./Models/Payment');
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')('sk_test_51N1YBmB8lKizNEhubYu9L7uXm4ibojlNut6rsQtJ659XnZswa2HS0hgvuNT0VYdHyq0Lb9A1QrbIT52lYBaShwfW00yU7A0qcb');
 
 require('dotenv').config();
-
 
 //middleware
 
@@ -160,6 +161,31 @@ app.get('/api/bookings/:id', async (req, res) => {
 
 
 
+
+// --------------- Payment with Stripe --------------------
+
+app.post('/create-payment-intent', async (req, res) => {
+  const booking = req.body;
+  const price = booking.price;
+  const amount = price * 100;
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    currency: 'usd',
+    amount: amount,
+    "payment_method_types": [
+      "card"
+    ]
+  })
+
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+
+})
+
+
+
+
 // ------------------ User -------------------------
 
 
@@ -245,6 +271,27 @@ app.delete('/api/doctors/:id', verifyJWT, verifyAdmin, async (req, res) => {
   res.send(deletedDoctor);
 })
 
+
+// ------------ Payment --------------
+
+app.post('/api/payments', async (req, res) => {
+  const payment = req.body;
+  const newPayment = new Payment(payment);
+  const result = await newPayment.save();
+  const id = payment.bookingId;
+  const filter = { _id: id };
+
+  const updatedDoc = {
+    $set: {
+      paid: true,
+      transactionId: payment.transactionId
+    }
+  }
+
+  const updatedResult = await Booking.findOneAndUpdate(filter, updatedDoc, { upsert: true });
+
+  res.send(result);
+})
 
 
 

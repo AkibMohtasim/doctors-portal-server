@@ -8,7 +8,8 @@ const bookingSchema = new mongoose.Schema({
   slot: String,
   email: String,
   phone: String,
-  price: Number
+  price: Number,
+  paid: Boolean
 },
   {
     collection: 'bookings'
